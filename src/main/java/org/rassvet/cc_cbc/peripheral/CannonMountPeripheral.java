@@ -2,20 +2,23 @@ package org.rassvet.cc_cbc.peripheral;
 
 import dan200.computercraft.api.lua.LuaException;
 import dan200.computercraft.api.lua.LuaFunction;
+import dan200.computercraft.api.peripheral.IComputerAccess;
 import dan200.computercraft.api.peripheral.IPeripheral;
 import net.minecraft.world.level.block.state.BlockState;
-import org.jspecify.annotations.Nullable;
 import rbasamoyai.createbigcannons.cannon_control.cannon_mount.CannonMountBlock;
 import rbasamoyai.createbigcannons.cannon_control.cannon_mount.CannonMountBlockEntity;
 import rbasamoyai.createbigcannons.cannon_control.contraption.PitchOrientedContraptionEntity;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 public final class CannonMountPeripheral implements IPeripheral {
     private static final int STRONG_SIGNAL = 15;
 
     private final CannonMountBlockEntity mount;
+    private final Set<IComputerAccess> attachedComputers = new HashSet<>();
 
     public CannonMountPeripheral(CannonMountBlockEntity mount) {
         this.mount = mount;
@@ -115,8 +118,54 @@ public final class CannonMountPeripheral implements IPeripheral {
     }
 
     @Override
-    public boolean equals(@Nullable IPeripheral other) {
+    public boolean equals(IPeripheral other) {
         return other instanceof CannonMountPeripheral peripheral && peripheral.mount == this.mount;
+    }
+
+    @Override
+    public void attach(IComputerAccess computer) {
+        synchronized (this.attachedComputers) {
+            this.attachedComputers.add(computer);
+        }
+    }
+
+    @Override
+    public void detach(IComputerAccess computer) {
+        boolean noComputersLeft;
+        synchronized (this.attachedComputers) {
+            this.attachedComputers.remove(computer);
+            noComputersLeft = this.attachedComputers.isEmpty();
+        }
+
+        if (!noComputersLeft) {
+            return;
+        }
+
+        if (this.mount.getLevel() == null || this.mount.getLevel().getServer() == null) {
+            return;
+        }
+
+        // Ignore disconnects during shutdown/relog; keep persisted CC mode across world re-entry.
+        if (this.mount.getLevel().getServer().getPlayerCount() <= 0) {
+            return;
+        }
+
+        if (CannonMountControlManager.isComputerControl(this.mount)) {
+            CannonMountControlManager.setComputerControl(this.mount, false);
+        }
+
+        // Return to redstone-driven behavior on disconnect: no redstone -> disassemble via CBC redstone path.
+        if (!this.mount.getLevel().hasNeighborSignal(this.mount.getBlockPos()) && this.mount.isRunning()) {
+            forceRedstoneDisassemble();
+            clearAssemblyPowered();
+        }
+    }
+
+    private void forceRedstoneDisassemble() {
+        BlockState state = this.mount.getBlockState();
+        boolean firePowered = state.getValue(CannonMountBlock.FIRE_POWERED);
+        // Simulate assembly power falling edge (true -> false) to use CBC's safe disassembly path.
+        this.mount.onRedstoneUpdate(false, true, firePowered, firePowered, 0);
     }
 
     private void clearAssemblyPowered() {

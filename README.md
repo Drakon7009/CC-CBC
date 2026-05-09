@@ -1,4 +1,4 @@
-# CC-CBC
+# CC:CBC
 
 A **CC: Tweaked** peripheral that adds computer control for cannons from **Create Big Cannons**.
 
@@ -37,3 +37,4 @@ Peripheral type: `cannon_mount`
 | `yawShaftSpeed` | `number` | Yaw interface shaft speed. |
 | `pitchShaftSpeed` | `number` | Pitch interface shaft speed. |
 | `x`, `y`, `z` | `number` | `Cannon Mount` position in the world. |
+- `yaw` values in the API are presented in the `0..360` range to match in-game display.

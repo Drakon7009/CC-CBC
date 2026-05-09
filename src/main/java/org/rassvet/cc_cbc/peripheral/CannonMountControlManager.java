@@ -22,19 +22,25 @@ public final class CannonMountControlManager {
 
     public static void setComputerControl(CannonMountBlockEntity mount, boolean enabled) {
         ControlState state = getState(mount);
+
+        // Capture in the same frame used by setYaw/setPitch to avoid frame-mismatch jumps.
+        double capturedYaw = getMountedYaw(mount);
+        double capturedPitch = getMountedPitch(mount);
+
         state.computerControl = enabled;
+        if (enabled) {
+            state.currentYaw = capturedYaw;
+            state.currentPitch = capturedPitch;
+            state.targetYaw = capturedYaw;
+            state.targetPitch = capturedPitch;
+            state.displayTargetYaw = capturedYaw;
+        }
 
         setDriveLock(mount, enabled);
-        // Persist lock changes immediately so relog does not restore stale angle limits.
+
+        // Persist lock/angle state immediately so relog does not restore stale state.
         mount.setChanged();
         mount.sendData();
-
-        if (enabled) {
-            state.currentYaw = getMountedYaw(mount);
-            state.currentPitch = getMountedPitch(mount);
-            state.targetYaw = state.currentYaw;
-            state.targetPitch = state.currentPitch;
-        }
     }
 
     public static boolean isComputerControl(CannonMountBlockEntity mount) {
@@ -174,8 +180,8 @@ public final class CannonMountControlManager {
     }
 
     private static double getMountedPitch(CannonMountBlockEntity mount) {
-        PitchOrientedContraptionEntity contraption = mount.getContraption();
-        return contraption != null ? contraption.pitch : mount.getDisplayPitch();
+        // Use mount display frame for pitch; this is the same frame used by CC-facing controls.
+        return mount.getDisplayPitch();
     }
 
     private static void setDriveLock(CannonMountBlockEntity mount, boolean locked) {
@@ -226,4 +232,3 @@ public final class CannonMountControlManager {
         private double displayTargetYaw;
     }
 }
-

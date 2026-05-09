@@ -75,7 +75,7 @@ side = "BOTH"
 [[dependencies."${mod_id}"]]
 modId = "computercraft"
 type = "required"
-versionRange = "[1.118.0,)"
+versionRange = "[${cc_tweaked_version},)"
 ordering = "AFTER"
 side = "BOTH"
 
