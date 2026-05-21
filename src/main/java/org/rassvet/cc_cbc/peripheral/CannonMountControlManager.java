@@ -16,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class CannonMountControlManager {
     private static final Map<MountKey, ControlState> STATES = new ConcurrentHashMap<>();
+    private static final Map<MountKey, CannonMountPeripheral> PERIPHERALS = new ConcurrentHashMap<>();
 
     private CannonMountControlManager() {
     }
@@ -41,6 +42,10 @@ public final class CannonMountControlManager {
         // Persist lock/angle state immediately so relog does not restore stale state.
         mount.setChanged();
         mount.sendData();
+    }
+
+    public static CannonMountPeripheral getPeripheral(CannonMountBlockEntity mount) {
+        return PERIPHERALS.computeIfAbsent(new MountKey(mount.getLevel().dimension(), mount.getBlockPos()), ignored -> new CannonMountPeripheral(mount));
     }
 
     public static boolean isComputerControl(CannonMountBlockEntity mount) {
@@ -76,6 +81,7 @@ public final class CannonMountControlManager {
 
     public static void tickLevel(ServerLevel level) {
         ResourceKey<Level> dimension = level.dimension();
+        tickPeripherals(level, dimension);
         Iterator<Map.Entry<MountKey, ControlState>> iterator = STATES.entrySet().iterator();
 
         while (iterator.hasNext()) {
@@ -92,6 +98,27 @@ public final class CannonMountControlManager {
             }
 
             tickMount(mount, entry.getValue());
+        }
+    }
+
+    private static void tickPeripherals(ServerLevel level, ResourceKey<Level> dimension) {
+        Iterator<Map.Entry<MountKey, CannonMountPeripheral>> iterator = PERIPHERALS.entrySet().iterator();
+
+        while (iterator.hasNext()) {
+            Map.Entry<MountKey, CannonMountPeripheral> entry = iterator.next();
+            MountKey key = entry.getKey();
+            if (!key.dimension.equals(dimension)) {
+                continue;
+            }
+
+            BlockEntity be = level.getBlockEntity(key.pos);
+            if (!(be instanceof CannonMountBlockEntity mount) || mount.isRemoved()) {
+                iterator.remove();
+                STATES.remove(key);
+                continue;
+            }
+
+            entry.getValue().tick(level.getGameTime());
         }
     }
 
@@ -142,6 +169,22 @@ public final class CannonMountControlManager {
         return state;
     }
 
+    public static void scheduleDisconnectCleanup(CannonMountBlockEntity mount, long executeAtGameTime) {
+        getState(mount).disconnectCleanupAtGameTime = executeAtGameTime;
+    }
+
+    public static void cancelDisconnectCleanup(CannonMountBlockEntity mount) {
+        getState(mount).disconnectCleanupAtGameTime = -1;
+    }
+
+    public static boolean shouldRunDisconnectCleanup(CannonMountBlockEntity mount, long gameTime) {
+        return getState(mount).disconnectCleanupAtGameTime >= 0 && gameTime >= getState(mount).disconnectCleanupAtGameTime;
+    }
+
+    public static void finishDisconnectCleanup(CannonMountBlockEntity mount) {
+        getState(mount).disconnectCleanupAtGameTime = -1;
+    }
+
     private static ControlState createInitialState(CannonMountBlockEntity mount) {
         ControlState state = new ControlState();
         state.currentYaw = getMountedYaw(mount);
@@ -157,10 +200,12 @@ public final class CannonMountControlManager {
 
     public static void clearLevel(ResourceKey<Level> dimension) {
         STATES.keySet().removeIf(key -> key.dimension.equals(dimension));
+        PERIPHERALS.keySet().removeIf(key -> key.dimension.equals(dimension));
     }
 
     public static void clearAll() {
         STATES.clear();
+        PERIPHERALS.clear();
     }
 
     private static boolean isDriveLocked(CannonMountBlockEntity mount) {
@@ -230,5 +275,6 @@ public final class CannonMountControlManager {
         private double currentYaw;
         private double currentPitch;
         private double displayTargetYaw;
+        private long disconnectCleanupAtGameTime = -1;
     }
 }

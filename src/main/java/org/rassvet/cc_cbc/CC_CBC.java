@@ -11,7 +11,6 @@ import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import org.rassvet.cc_cbc.peripheral.CannonMountControlManager;
-import org.rassvet.cc_cbc.peripheral.CannonMountPeripheral;
 import org.slf4j.Logger;
 import rbasamoyai.createbigcannons.index.CBCBlockEntities;
 
@@ -32,7 +31,7 @@ public class CC_CBC {
         event.registerBlockEntity(
             PeripheralCapability.get(),
             CBCBlockEntities.CANNON_MOUNT.get(),
-            (mount, side) -> new CannonMountPeripheral(mount)
+            (mount, side) -> CannonMountControlManager.getPeripheral(mount)
         );
     }
 

@@ -127,6 +127,7 @@ public final class CannonMountPeripheral implements IPeripheral {
         synchronized (this.attachedComputers) {
             this.attachedComputers.add(computer);
         }
+        CannonMountControlManager.cancelDisconnectCleanup(this.mount);
     }
 
     @Override
@@ -142,6 +143,23 @@ public final class CannonMountPeripheral implements IPeripheral {
         }
 
         if (this.mount.getLevel() == null || this.mount.getLevel().getServer() == null) {
+            return;
+        }
+
+        CannonMountControlManager.scheduleDisconnectCleanup(this.mount, this.mount.getLevel().getGameTime() + 1);
+    }
+
+    public void tick(long gameTime) {
+        if (!CannonMountControlManager.shouldRunDisconnectCleanup(this.mount, gameTime)) {
+            return;
+        }
+        CannonMountControlManager.finishDisconnectCleanup(this.mount);
+
+        if (hasAttachedComputers()) {
+            return;
+        }
+
+        if (this.mount.isRemoved() || this.mount.getLevel() == null || this.mount.getLevel().getServer() == null) {
             return;
         }
 
@@ -172,6 +190,12 @@ public final class CannonMountPeripheral implements IPeripheral {
         BlockState state = this.mount.getBlockState();
         if (state.getValue(CannonMountBlock.ASSEMBLY_POWERED) && this.mount.getLevel() != null) {
             this.mount.getLevel().setBlock(this.mount.getBlockPos(), state.setValue(CannonMountBlock.ASSEMBLY_POWERED, false), 3);
+        }
+    }
+
+    private boolean hasAttachedComputers() {
+        synchronized (this.attachedComputers) {
+            return !this.attachedComputers.isEmpty();
         }
     }
 
