@@ -1,0 +1,16 @@
+{
+  "type": "createbigcannons:melting",
+  "heatRequirement": "heated",
+  "ingredients": [
+    {
+      "tag": "createbigcannons:ingot_nethersteel"
+    }
+  ],
+  "processingTime": 180,
+  "results": [
+    {
+      "amount": 7290,
+      "fluid": "createbigcannons:molten_nethersteel"
+    }
+  ]
+}

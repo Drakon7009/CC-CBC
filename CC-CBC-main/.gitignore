@@ -1,0 +1,29 @@
+# Gradle
+.gradle/
+build/
+out/
+
+# Runtime/run data
+run/
+logs/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Java
+*.class
+hs_err_pid*
+replay_pid*
+
+# Artifacts
+*.jar
+*.zip
+*.tar.gz
+

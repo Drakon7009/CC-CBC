@@ -1,0 +1,16 @@
+{
+  "type": "createbigcannons:melting",
+  "heatRequirement": "heated",
+  "ingredients": [
+    {
+      "tag": "c:steel_ingots"
+    }
+  ],
+  "processingTime": 180,
+  "results": [
+    {
+      "amount": 7290,
+      "fluid": "createbigcannons:molten_steel"
+    }
+  ]
+}

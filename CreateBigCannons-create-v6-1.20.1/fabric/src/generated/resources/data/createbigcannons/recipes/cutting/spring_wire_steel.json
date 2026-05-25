@@ -1,0 +1,14 @@
+{
+  "type": "create:cutting",
+  "ingredients": [
+    {
+      "tag": "c:steel_plates"
+    }
+  ],
+  "results": [
+    {
+      "count": 3,
+      "item": "createbigcannons:spring_wire"
+    }
+  ]
+}

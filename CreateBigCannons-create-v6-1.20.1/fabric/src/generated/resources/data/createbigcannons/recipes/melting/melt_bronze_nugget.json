@@ -1,0 +1,16 @@
+{
+  "type": "createbigcannons:melting",
+  "heatRequirement": "heated",
+  "ingredients": [
+    {
+      "tag": "createbigcannons:nugget_bronze"
+    }
+  ],
+  "processingTime": 20,
+  "results": [
+    {
+      "amount": 810,
+      "fluid": "createbigcannons:molten_bronze"
+    }
+  ]
+}

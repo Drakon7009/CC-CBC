@@ -1,0 +1,35 @@
+# Gradle
+.gradle/
+build/
+out/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# VS Code
+.vscode/
+
+# Run dirs
+run/
+run-data/
+
+# Local files
+local.properties
+local-maven/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Forge / FML
+src/generated/
+

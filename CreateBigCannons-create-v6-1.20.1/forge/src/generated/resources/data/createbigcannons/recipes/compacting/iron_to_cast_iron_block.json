@@ -1,0 +1,17 @@
+{
+  "type": "create:compacting",
+  "heatRequirement": "heated",
+  "ingredients": [
+    {
+      "tag": "forge:storage_blocks/iron"
+    },
+    {
+      "tag": "forge:storage_blocks/coal"
+    }
+  ],
+  "results": [
+    {
+      "item": "createbigcannons:cast_iron_block"
+    }
+  ]
+}

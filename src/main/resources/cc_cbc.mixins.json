@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "org.rassvet.cc_cbc.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "cc_cbc.refmap.json",
+  "mixins": [
+    "CannonMountBlockEntityMixin"
+  ],
+  "client": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
+
