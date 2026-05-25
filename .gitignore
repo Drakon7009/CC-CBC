@@ -30,6 +30,10 @@ local-maven/
 .DS_Store
 Thumbs.db
 
+# Сторонние исходники (не часть этого мода)
+CC-CBC-main/
+CreateBigCannons-create-v6-1.20.1/
+
 # Forge / FML
 src/generated/
 

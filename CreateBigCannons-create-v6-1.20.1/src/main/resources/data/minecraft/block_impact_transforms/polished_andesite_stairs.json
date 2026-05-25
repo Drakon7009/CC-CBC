@@ -1,6 +1,0 @@
-{
-  "transform_chance": 0.5,
-  "transforms": [
-    { "transform": { "block": "minecraft:andesite_stairs", "copy_properties": true } }
-  ]
-}

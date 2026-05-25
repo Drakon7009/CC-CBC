@@ -1,7 +1,0 @@
-{
-  "transform_chance": 0.8,
-  "transforms": [
-    { "transform": { "block": "minecraft:stone" }, "weight": 2 },
-    { "transform": { "block": "minecraft:cobblestone" }, "weight": 1 }
-  ]
-}
