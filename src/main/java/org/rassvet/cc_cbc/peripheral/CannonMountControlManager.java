@@ -6,8 +6,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import rbasamoyai.createbigcannons.cannon_control.cannon_mount.CannonMountBlockEntity;
-import rbasamoyai.createbigcannons.cannon_control.cannon_mount.CannonMountInterfaceBlockEntity;
+import org.rassvet.cc_cbc.api.CannonMountIntegration;
+import org.rassvet.cc_cbc.api.ControlledCannonMount;
 import rbasamoyai.createbigcannons.cannon_control.contraption.PitchOrientedContraptionEntity;
 
 import java.util.Iterator;
@@ -21,10 +21,9 @@ public final class CannonMountControlManager {
     private CannonMountControlManager() {
     }
 
-    public static void setComputerControl(CannonMountBlockEntity mount, boolean enabled) {
+    public static void setComputerControl(ControlledCannonMount mount, boolean enabled) {
         ControlState state = getState(mount);
 
-        // Capture in the same frame used by setYaw/setPitch to avoid frame-mismatch jumps.
         double capturedYaw = getMountedYaw(mount);
         double capturedPitch = getMountedPitch(mount);
 
@@ -38,25 +37,24 @@ public final class CannonMountControlManager {
         }
 
         setDriveLock(mount, enabled);
-
-        // Persist lock/angle state immediately so relog does not restore stale state.
+        syncMountedRotation(mount, capturedYaw, capturedPitch);
         mount.setChanged();
         mount.sendData();
     }
 
-    public static CannonMountPeripheral getPeripheral(CannonMountBlockEntity mount) {
-        return PERIPHERALS.computeIfAbsent(new MountKey(mount.getLevel().dimension(), mount.getBlockPos()), ignored -> new CannonMountPeripheral(mount));
+    public static CannonMountPeripheral getPeripheral(ControlledCannonMount mount) {
+        return PERIPHERALS.computeIfAbsent(new MountKey(mount.getCcCbcLevel().dimension(), mount.getCcCbcBlockPos()), ignored -> new CannonMountPeripheral(mount));
     }
 
-    public static boolean isComputerControl(CannonMountBlockEntity mount) {
+    public static boolean isComputerControl(ControlledCannonMount mount) {
         return getState(mount).computerControl;
     }
 
-    public static void setTargetAngles(CannonMountBlockEntity mount, double yaw, double pitch) {
+    public static void setTargetAngles(ControlledCannonMount mount, double yaw, double pitch) {
         setTargetAngles(mount, yaw, pitch, normalizeYaw(yaw));
     }
 
-    public static void setTargetAngles(CannonMountBlockEntity mount, double worldYaw, double pitch, double displayYaw) {
+    public static void setTargetAngles(ControlledCannonMount mount, double worldYaw, double pitch, double displayYaw) {
         ControlState state = getState(mount);
         state.targetYaw = normalizeYaw(worldYaw);
         state.targetPitch = pitch;
@@ -67,15 +65,15 @@ public final class CannonMountControlManager {
         }
     }
 
-    public static double getTargetYaw(CannonMountBlockEntity mount) {
+    public static double getTargetYaw(ControlledCannonMount mount) {
         return getState(mount).targetYaw;
     }
 
-    public static double getTargetPitch(CannonMountBlockEntity mount) {
+    public static double getTargetPitch(ControlledCannonMount mount) {
         return getState(mount).targetPitch;
     }
 
-    public static double getDisplayTargetYaw(CannonMountBlockEntity mount) {
+    public static double getDisplayTargetYaw(ControlledCannonMount mount) {
         return getState(mount).displayTargetYaw;
     }
 
@@ -91,8 +89,8 @@ public final class CannonMountControlManager {
                 continue;
             }
 
-            BlockEntity be = level.getBlockEntity(key.pos);
-            if (!(be instanceof CannonMountBlockEntity mount) || mount.isRemoved()) {
+            ControlledCannonMount mount = CannonMountIntegration.find(level.getBlockEntity(key.pos));
+            if (mount == null || mount.isCcCbcRemoved()) {
                 STATES.remove(key);
                 continue;
             }
@@ -111,8 +109,8 @@ public final class CannonMountControlManager {
                 continue;
             }
 
-            BlockEntity be = level.getBlockEntity(key.pos);
-            if (!(be instanceof CannonMountBlockEntity mount) || mount.isRemoved()) {
+            ControlledCannonMount mount = CannonMountIntegration.find(level.getBlockEntity(key.pos));
+            if (mount == null || mount.isCcCbcRemoved()) {
                 iterator.remove();
                 STATES.remove(key);
                 continue;
@@ -122,7 +120,7 @@ public final class CannonMountControlManager {
         }
     }
 
-    private static void tickMount(CannonMountBlockEntity mount, ControlState state) {
+    private static void tickMount(ControlledCannonMount mount, ControlState state) {
         if (!state.computerControl) {
             return;
         }
@@ -131,7 +129,17 @@ public final class CannonMountControlManager {
 
         PitchOrientedContraptionEntity contraption = mount.getContraption();
         if (!mount.isRunning() || contraption == null) {
+            state.lastContraptionId = -1;
             return;
+        }
+
+        // Если contraption только что собрана (новая entity) — берём её реальные углы как отправную точку,
+        // чтобы не было резкого прыжка к сохранённому state.currentYaw
+        if (state.lastContraptionId != contraption.getId()) {
+            state.lastContraptionId = contraption.getId();
+            float pitchSign = getPitchSign(contraption);
+            state.currentYaw = normalizeYaw(contraption.yaw);
+            state.currentPitch = contraption.pitch / pitchSign;
         }
 
         double minPitch = -contraption.maximumDepression();
@@ -147,11 +155,13 @@ public final class CannonMountControlManager {
 
         mount.setYaw((float) state.currentYaw);
         mount.setPitch((float) state.currentPitch);
+        syncMountedRotation(mount, state.currentYaw, state.currentPitch);
+        mount.setChanged();
         mount.sendData();
     }
 
-    private static ControlState getState(CannonMountBlockEntity mount) {
-        MountKey key = new MountKey(mount.getLevel().dimension(), mount.getBlockPos());
+    private static ControlState getState(ControlledCannonMount mount) {
+        MountKey key = new MountKey(mount.getCcCbcLevel().dimension(), mount.getCcCbcBlockPos());
         ControlState state = STATES.computeIfAbsent(key, ignored -> createInitialState(mount));
 
         boolean locked = isDriveLocked(mount);
@@ -169,31 +179,30 @@ public final class CannonMountControlManager {
         return state;
     }
 
-    public static void scheduleDisconnectCleanup(CannonMountBlockEntity mount, long executeAtGameTime) {
+    public static void scheduleDisconnectCleanup(ControlledCannonMount mount, long executeAtGameTime) {
         getState(mount).disconnectCleanupAtGameTime = executeAtGameTime;
     }
 
-    public static void cancelDisconnectCleanup(CannonMountBlockEntity mount) {
+    public static void cancelDisconnectCleanup(ControlledCannonMount mount) {
         getState(mount).disconnectCleanupAtGameTime = -1;
     }
 
-    public static boolean shouldRunDisconnectCleanup(CannonMountBlockEntity mount, long gameTime) {
-        return getState(mount).disconnectCleanupAtGameTime >= 0 && gameTime >= getState(mount).disconnectCleanupAtGameTime;
+    public static boolean shouldRunDisconnectCleanup(ControlledCannonMount mount, long gameTime) {
+        ControlState state = getState(mount);
+        return state.disconnectCleanupAtGameTime >= 0 && gameTime >= state.disconnectCleanupAtGameTime;
     }
 
-    public static void finishDisconnectCleanup(CannonMountBlockEntity mount) {
+    public static void finishDisconnectCleanup(ControlledCannonMount mount) {
         getState(mount).disconnectCleanupAtGameTime = -1;
     }
 
-    private static ControlState createInitialState(CannonMountBlockEntity mount) {
+    private static ControlState createInitialState(ControlledCannonMount mount) {
         ControlState state = new ControlState();
         state.currentYaw = getMountedYaw(mount);
         state.currentPitch = getMountedPitch(mount);
         state.targetYaw = state.currentYaw;
         state.targetPitch = state.currentPitch;
         state.displayTargetYaw = state.currentYaw;
-
-        // Interface angle limits are serialized by CBC, so this restores CC mode after relog/chunk reload.
         state.computerControl = isDriveLocked(mount);
         return state;
     }
@@ -208,35 +217,48 @@ public final class CannonMountControlManager {
         PERIPHERALS.clear();
     }
 
-    private static boolean isDriveLocked(CannonMountBlockEntity mount) {
-        double yawLimit = mount.getYawInterface() instanceof CannonMountInterfaceBlockEntity yawInterface
-            ? yawInterface.getSequencedAngleLimit()
-            : -1;
-        double pitchLimit = mount.getPitchInterface() instanceof CannonMountInterfaceBlockEntity pitchInterface
-            ? pitchInterface.getSequencedAngleLimit()
-            : -1;
-
-        return yawLimit == 0.0 && pitchLimit == 0.0;
+    private static boolean isDriveLocked(ControlledCannonMount mount) {
+        return mount.isDriveLocked();
     }
 
-    private static double getMountedYaw(CannonMountBlockEntity mount) {
+    private static double getMountedYaw(ControlledCannonMount mount) {
         PitchOrientedContraptionEntity contraption = mount.getContraption();
-        return normalizeYaw(contraption != null ? contraption.yaw : mount.getYawOffset(0));
+        return normalizeYaw(contraption != null ? contraption.yaw : mount.getYaw());
     }
 
-    private static double getMountedPitch(CannonMountBlockEntity mount) {
-        // Use mount display frame for pitch; this is the same frame used by CC-facing controls.
-        return mount.getDisplayPitch();
+    private static double getMountedPitch(ControlledCannonMount mount) {
+        return mount.getPitch();
     }
 
-    private static void setDriveLock(CannonMountBlockEntity mount, boolean locked) {
-        double limit = locked ? 0.0 : -1.0;
-        if (mount.getYawInterface() instanceof CannonMountInterfaceBlockEntity yawInterface) {
-            yawInterface.setSequencedAngleLimit(limit);
+    private static void setDriveLock(ControlledCannonMount mount, boolean locked) {
+        mount.setDriveLock(locked);
+    }
+
+    private static void syncMountedRotation(ControlledCannonMount mount, double yaw, double pitch) {
+        PitchOrientedContraptionEntity contraption = mount.getContraption();
+        if (contraption == null) {
+            return;
         }
-        if (mount.getPitchInterface() instanceof CannonMountInterfaceBlockEntity pitchInterface) {
-            pitchInterface.setSequencedAngleLimit(limit);
-        }
+
+        float syncedYaw = (float) normalizeYaw(yaw);
+        float syncedPitch = (float) pitch;
+        float pitchSign = getPitchSign(contraption);
+
+        contraption.yaw = syncedYaw;
+        contraption.pitch = syncedPitch * pitchSign;
+        contraption.setYRot(syncedYaw);
+        contraption.setXRot(contraption.pitch);
+        contraption.yRotO = contraption.getYRot();
+        contraption.xRotO = contraption.getXRot();
+    }
+
+    private static float getPitchSign(PitchOrientedContraptionEntity contraption) {
+        return contraption.getInitialOrientation().getAxis() == net.minecraft.core.Direction.Axis.X
+            && contraption.getInitialOrientation().getAxisDirection() == net.minecraft.core.Direction.AxisDirection.POSITIVE
+            || contraption.getInitialOrientation().getAxis() != net.minecraft.core.Direction.Axis.X
+            && contraption.getInitialOrientation().getAxisDirection() == net.minecraft.core.Direction.AxisDirection.NEGATIVE
+            ? 1.0f
+            : -1.0f;
     }
 
     private static double moveTowards(double current, double target, double step) {
@@ -276,5 +298,6 @@ public final class CannonMountControlManager {
         private double currentPitch;
         private double displayTargetYaw;
         private long disconnectCleanupAtGameTime = -1;
+        private int lastContraptionId = -1;
     }
 }
