@@ -40,3 +40,9 @@ Peripheral type: `cannon_mount`
 | `pitchShaftSpeed` | `number` | Pitch interface shaft speed. |
 | `x`, `y`, `z` | `number` | `Cannon Mount` position in the world. |
 - `yaw` values in the API are presented in the `0..360` range to match in-game display.
+
+## For Developers
+
+Want to add CC:CBC support to your own cannon mount?
+
+See [DEVELOPER_INTEGRATION.md](DEVELOPER_INTEGRATION.md).
