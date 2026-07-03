@@ -14,7 +14,10 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.fml.common.Mod;
+import org.rassvet.cc_cbc.api.CannonMountIntegration;
 import org.rassvet.cc_cbc.peripheral.CannonMountControlManager;
+import org.rassvet.cc_cbc.peripheral.CbcCannonMountAdapter;
+import org.rassvet.cc_cbc.peripheral.ReflectiveCannonMountAdapter;
 import rbasamoyai.createbigcannons.cannon_control.cannon_mount.CannonMountBlockEntity;
 import org.slf4j.Logger;
 
@@ -24,6 +27,9 @@ public class Cc_cbc {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     public Cc_cbc() {
+        CannonMountIntegration.registerAdapter(blockEntity ->
+            blockEntity instanceof CannonMountBlockEntity mount ? new CbcCannonMountAdapter(mount) : null);
+        CannonMountIntegration.registerAdapter(ReflectiveCannonMountAdapter::create);
         ForgeComputerCraftAPI.registerPeripheralProvider(this::getPeripheral);
         MinecraftForge.EVENT_BUS.addListener(this::onLevelTick);
         MinecraftForge.EVENT_BUS.addListener(this::onLevelUnload);
@@ -33,7 +39,8 @@ public class Cc_cbc {
 
     private LazyOptional<IPeripheral> getPeripheral(Level level, BlockPos pos, Direction side) {
         BlockEntity blockEntity = level.getBlockEntity(pos);
-        if (blockEntity instanceof CannonMountBlockEntity mount && !mount.isRemoved()) {
+        var mount = CannonMountIntegration.find(blockEntity);
+        if (mount != null && !mount.isCcCbcRemoved()) {
             return LazyOptional.of(() -> CannonMountControlManager.getPeripheral(mount));
         }
 
